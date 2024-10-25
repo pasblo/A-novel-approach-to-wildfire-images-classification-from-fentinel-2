@@ -13,8 +13,8 @@ DATASETS_FOLDER_PATHS = "G:\\0 - zip-data"
 ZIP_FILES_FOLDER = "G:\\1 - raw-data"
 JPEGS_FILES_FOLDER = "G:\\2 - processed-data"
 DATASET_GROUP = "_60_"
-OUTPUT_IMAGES_WIDTH = 500
-OUTPUT_IMAGES_HEIGHT = 500
+OUTPUT_IMAGES_WIDTH = 512
+OUTPUT_IMAGES_HEIGHT = 512
 SHOW_INFO = False
 
 ########################################################
@@ -142,10 +142,14 @@ def visualize_label(label):
     if label.ndim > 2:
         label = np.squeeze(label)
     
-    # Scale label values to 0-255 for visualization
-    label_max = label.max()
+    # Scale all values to 255
+    """label_max = label.max()
     if label_max > 0:
-        label = (label / label_max) * 255
+        label = (label / label_max) * 255"""
+    
+    # Change ones by 255 and 2 by 0 (2 means is not sure of fire)
+    label[label == 1] = 255
+    label[label == 2] = 0
     label = label.astype(np.uint8)
     return label
 
@@ -244,10 +248,10 @@ for h5_file_name in h5_files:
                             label_pre_visual = visualize_label(label_pre_tile)
 
                             # Save pre image and label
-                            pre_image_path = os.path.join(input_folder_path, f"{filename}.jpg")
+                            pre_image_path = os.path.join(input_folder_path, f"{filename}.png")
                             imageio.imwrite(pre_image_path, sen2_pre_tile_uint8)
 
-                            pre_label_path = os.path.join(output_folder_path, f"{filename}.jpg")
+                            pre_label_path = os.path.join(output_folder_path, f"{filename}.png")
                             imageio.imwrite(pre_label_path, label_pre_visual) # label_pre_tile_uint8
 
                             # Process post image and label
@@ -266,10 +270,10 @@ for h5_file_name in h5_files:
                             label_post_visual = visualize_label(label_post_tile)
 
                             # Save post image and label
-                            post_image_path = os.path.join(input_folder_path, f"{filename}.jpg")
+                            post_image_path = os.path.join(input_folder_path, f"{filename}.png")
                             imageio.imwrite(post_image_path, sen2_post_tile_uint8)
 
-                            post_label_path = os.path.join(output_folder_path, f"{filename}.jpg")
+                            post_label_path = os.path.join(output_folder_path, f"{filename}.png")
                             imageio.imwrite(post_label_path, label_post_visual) # label_post_tile_uint8
 
                 else:
