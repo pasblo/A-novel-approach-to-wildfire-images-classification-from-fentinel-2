@@ -1,17 +1,23 @@
 import hdf5plugin
 import h5py
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
-# Path to the .h5 file
-PATH_H5 = "G:\\1 - raw-data\\FLOGA_dataset_2017_sen2_60_mod_500.h5"
+# Configurations
+GIT_FOLDER_ONLY = True # Set to true if working with the git folder database
+DATASET_NAME = "FLOGA_dataset_2017_sen2_60_mod_500"
 EVENT = "0"
-
-# SELECT MODE
-GET_DATABASE_INFO = False
-GET_SAMPLE_LAYERS = False
+GET_DATABASE_INFO = True
+GET_SAMPLE_LAYERS = True
 GET_PICTURES = True
+
+# Generate paths
+if GIT_FOLDER_ONLY:
+    PATH_H5 = os.path.abspath(f'../repo/db/raw_db/{DATASET_NAME}.h5')
+else:
+    PATH_H5 = f"G:\\1 - raw-data\\{DATASET_NAME}.h5"
 
 if GET_DATABASE_INFO:
     def print_structure(name, obj):

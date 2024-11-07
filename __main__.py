@@ -1,5 +1,6 @@
 # Import libraries
 import os
+import cv2
 import torch
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
@@ -12,7 +13,7 @@ from PIL import Image
 from torch.cuda.amp import autocast, GradScaler
 
 # Configuration
-GIT_FOLDER_ONLY = False # Set to true if working with the git folder database
+GIT_FOLDER_ONLY = True # Set to true if working with the git folder database
 DATASET_NAME = "512x512_Ignored2_60_rgb_png_7056"
 REAL_DATASET_HW = 512 # Source
 GOAL_DATASET_HW = 256 # Goal
@@ -20,12 +21,12 @@ REAL_DATASET_SIZE = 7056
 GOAL_DATASET_SIZE = 7056
 N_BATCHES = 1008
 VISUALIZE_DATA = False
-LOAD_FROM_MODEL = False
+LOAD_FROM_MODEL = True
 TEST_MODEL_WITH_PICTURE = True
 if GIT_FOLDER_ONLY:
-    MODEL_PATH = f'../Final Project/repo/model/{DATASET_NAME}_{GOAL_DATASET_HW}_{GOAL_DATASET_SIZE}.pth'
-    DATASET_PATH = f'../Final Project/repo/db/formatted_db/{DATASET_NAME}.h5'
-    TEST_PICTURE = os.path.abspath(f'../Final Project/repo/db/raw_images/{DATASET_NAME}/Input/201-1-2017_3.png')
+    MODEL_PATH = os.path.abspath(f'../repo/model/{DATASET_NAME}_{GOAL_DATASET_HW}_{GOAL_DATASET_SIZE}.pth')
+    DATASET_PATH = os.path.abspath(f'../repo/db/formatted_db/{DATASET_NAME}.h5')
+    TEST_PICTURE = os.path.abspath(f'../repo/db/raw_images/{DATASET_NAME}/Input/323-1-2017_45.png')
 
 else:
     MODEL_PATH = f'G:/4 - models/{DATASET_NAME}_{GOAL_DATASET_HW}_{GOAL_DATASET_SIZE}.pth'
@@ -384,6 +385,21 @@ if TEST_MODEL_WITH_PICTURE:
     # Convert the input image to a NumPy array for visualization
     original_image_np = np.array(input_image)
 
+    # Convert RGB to HSV
+    hsv_image = cv2.cvtColor(predicted_mask_np, cv2.COLOR_RGB2HSV).astype(np.float32)
+
+    # Increase saturation by 10x (1000%)
+    hsv_image[:, :, 1] *= 10
+
+    # Clip the saturation values to the maximum value of 255
+    hsv_image[:, :, 1] = np.clip(hsv_image[:, :, 1], 0, 255)
+
+    # Convert back to uint8
+    hsv_image = hsv_image.astype(np.uint8)
+
+    # Convert HSV back to RGB
+    saturated_image = cv2.cvtColor(hsv_image, cv2.COLOR_HSV2RGB)
+
     # Create a figure with two subplots
     fig, axs = plt.subplots(1, 2, figsize=(12, 6))
 
@@ -393,8 +409,12 @@ if TEST_MODEL_WITH_PICTURE:
     axs[0].axis('off')
 
     # Display the predicted mask
-    axs[1].imshow(predicted_mask_np, cmap='gray')
-    axs[1].set_title('Predicted Mask')
+    #axs[1].imshow(predicted_mask_np, cmap='gray')
+    #axs[1].set_title('Predicted Mask')
+    #axs[1].axis('off')
+
+    axs[1].imshow(saturated_image)
+    axs[1].set_title('Increased Saturation (1000%)')
     axs[1].axis('off')
 
     plt.show()

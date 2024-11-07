@@ -4,9 +4,8 @@ import h5py
 from PIL import Image
 from sklearn.model_selection import train_test_split
 
-GIT_FOLDER_ONLY = False # Set to true if working with the git folder database
-
 # Configurations
+GIT_FOLDER_ONLY = False # Set to true if working with the git folder database
 DATASET_NAME = "512x512_Ignored2_60_rgb_png_7056"
 TEST_SIZE = 0.2  # Set the percentage of data to be used for testing (e.g., 20%)
 
