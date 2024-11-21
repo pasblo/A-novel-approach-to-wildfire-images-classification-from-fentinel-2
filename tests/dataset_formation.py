@@ -7,9 +7,9 @@ import albumentations as A
 
 # Configurations
 GIT_FOLDER_ONLY = False  # Set to true if working with the git folder database
-DATASET_NAME = "512x512_Ignored2_60_rgb_png_7056_augmented"
+DATASET_NAME = "256x256_Ignored2_60_rgb_png_28980"
 TEST_SIZE = 0.2  # Percentage of data to be used for testing (e.g., 20%)
-NUM_AUGMENTATIONS_PER_IMAGE = 1  # Number of augmented versions to create per image
+NUM_AUGMENTATIONS_PER_IMAGE = 0  # Number of augmented versions to create per image
 
 # Set the paths to the Input and Output folders
 if GIT_FOLDER_ONLY:

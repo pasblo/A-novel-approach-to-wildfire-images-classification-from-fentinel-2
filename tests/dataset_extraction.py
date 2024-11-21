@@ -12,7 +12,7 @@ import imageio
 DATASETS_FOLDER_PATHS = "G:\\0 - zip-data"
 ZIP_FILES_FOLDER = "G:\\1 - raw-data"
 JPEGS_FILES_FOLDER = "G:\\2 - processed-data"
-DATASET_GROUP = "_20_"
+DATASET_GROUP = "_60_"
 OUTPUT_IMAGES_WIDTH = 256
 OUTPUT_IMAGES_HEIGHT = 256
 SHOW_INFO = False
@@ -164,17 +164,17 @@ for h5_file_name in h5_files:
             for event_group_name in year_group.keys():
                 group = year_group[event_group_name]
                 print(f"Processing group: {year_group_name}/{event_group_name}")
-                # Extract datasets 'sen2_60_post', 'sen2_60_pre', and 'label'
+                # Extract datasets 'sen2_X_post', 'sen2_X_pre', and 'label'
                 if f'sen2{DATASET_GROUP}post' in group and f'sen2{DATASET_GROUP}pre' in group and 'label' in group:
-                    sen2_60_post = group[f'sen2{DATASET_GROUP}post'][:]
-                    sen2_60_pre = group[f'sen2{DATASET_GROUP}pre'][:]
+                    sen2_X_post = group[f'sen2{DATASET_GROUP}post'][:]
+                    sen2_X_pre = group[f'sen2{DATASET_GROUP}pre'][:]
                     label = group['label'][:]
                     label = np.squeeze(label)  # Ensure label is 2D
 
                     # Create a new label image of zeros with the same size as 'label'
                     new_label = np.zeros_like(label)
 
-                    # Now we have four images: 'sen2_60_pre', 'sen2_60_post', 'label', 'new_label'
+                    # Now we have four images: 'sen2_X_pre', 'sen2_X_post', 'label', 'new_label'
 
                     # Process images (convert to RGB images)
                     # Define the bands to use
@@ -185,25 +185,25 @@ for h5_file_name in h5_files:
                     else:
                         sen2_plot_bands = [3, 2, 1]  # Red, Green, Blue bands
 
-                    # For 'sen2_60_pre' and 'sen2_60_post', select the bands
-                    num_bands = sen2_60_pre.shape[0]
+                    # For 'sen2_X_pre' and 'sen2_X_post', select the bands
+                    num_bands = sen2_X_pre.shape[0]
                     if max(sen2_plot_bands) >= num_bands:
                         print(f"Dataset has only {num_bands} bands, cannot use bands {sen2_plot_bands}")
                         continue
 
                     # Extract the bands
-                    sen2_60_pre_img = sen2_60_pre[sen2_plot_bands, ...]
-                    sen2_60_post_img = sen2_60_post[sen2_plot_bands, ...]
+                    sen2_X_pre_img = sen2_X_pre[sen2_plot_bands, ...]
+                    sen2_X_post_img = sen2_X_post[sen2_plot_bands, ...]
                     label_img = label
                     new_label_img = new_label
 
                     # Scale the images
-                    sen2_60_pre_img = scale_image(sen2_60_pre_img)
-                    sen2_60_post_img = scale_image(sen2_60_post_img)
+                    sen2_X_pre_img = scale_image(sen2_X_pre_img)
+                    sen2_X_post_img = scale_image(sen2_X_post_img)
 
                     # Move the channel axis to the last dimension
-                    sen2_60_pre_img = np.moveaxis(sen2_60_pre_img, 0, -1)
-                    sen2_60_post_img = np.moveaxis(sen2_60_post_img, 0, -1)
+                    sen2_X_pre_img = np.moveaxis(sen2_X_pre_img, 0, -1)
+                    sen2_X_post_img = np.moveaxis(sen2_X_post_img, 0, -1)
 
                     # Get image dimensions
                     img_height, img_width = label_img.shape  # assuming label has same dimensions as the images
@@ -222,8 +222,8 @@ for h5_file_name in h5_files:
                             y_end = y_start + OUTPUT_IMAGES_HEIGHT
 
                             # Extract tile from each image
-                            sen2_pre_tile = sen2_60_pre_img[y_start:y_end, x_start:x_end, :]
-                            sen2_post_tile = sen2_60_post_img[y_start:y_end, x_start:x_end, :]
+                            sen2_pre_tile = sen2_X_pre_img[y_start:y_end, x_start:x_end, :]
+                            sen2_post_tile = sen2_X_post_img[y_start:y_end, x_start:x_end, :]
                             label_post_tile = label_img[y_start:y_end, x_start:x_end]
                             label_pre_tile = new_label_img[y_start:y_end, x_start:x_end]
 

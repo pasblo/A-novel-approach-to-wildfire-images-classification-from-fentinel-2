@@ -65,14 +65,24 @@ def run_experiment(CONFIG):
         # Instantiate your model class
         model = WildfireSegmentation(use_se=CONFIG['USE_SE'], use_cbam=CONFIG['USE_CBAM'])
 
-        # Load the saved state_dict
-        model.load_state_dict(torch.load(CONFIG['MODEL_PATH']))
+        try:
+            # Load the saved state_dict
+            model.load_state_dict(torch.load(CONFIG['MODEL_PATH']))
+        
+        except Exception as e:
+            print(f"No model found in the specified path: {CONFIG['MODEL_PATH']}")
+            return [], [], 0
 
         # Move the model to the appropriate device
         model.to(device)
 
         # Set the model to evaluation mode
         model.eval()
+
+        # Define dummy losses
+        train_losses = []
+        val_losses = []
+        test_loss = 0
 
     else:
 
@@ -84,6 +94,7 @@ def run_experiment(CONFIG):
         if CONFIG['OVERSAMPLE']:
             # Flatten masks to find positive samples
             ytrain_flat = ytrain.view(ytrain.size(0), -1).sum(dim=1)
+
             # Create labels: 0 if no positive pixels, 1 if any positive pixels
             ytrain_labels = (ytrain_flat > 0).long()
 
@@ -94,6 +105,7 @@ def run_experiment(CONFIG):
             sampler = WeightedRandomSampler(samples_weight, len(samples_weight))
 
             train_dataloader = DataLoader(train_set, batch_size=batch_size, sampler=sampler)
+
         else:
             train_dataloader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
 
@@ -189,7 +201,7 @@ def run_experiment(CONFIG):
                 # Accumulate the loss scaled by the number of images in the batch
                 running_loss += loss.item() * images.size(0)
 
-                batch_end_time = time.time()  # End time for the current batch
+                """batch_end_time = time.time()  # End time for the current batch
 
                 # Calculate time estimates
                 time_elapsed_so_far = time.time() - epoch_start_time
@@ -199,7 +211,7 @@ def run_experiment(CONFIG):
                 # Print progress for the current batch with time estimates
                 print(f'Epoch: {epoch}, Batch {batch + 1}/{total_batches}, Batch Loss: {loss.item():.4f}, '
                       f'Time per batch: {batch_end_time - batch_start_time:.3f} s, '
-                      f'Estimated time left for epoch: {estimated_time_left:.2f} s')
+                      f'Estimated time left for epoch: {estimated_time_left:.2f} s')"""
 
             epoch_end_time = time.time()  # End time for the epoch
             # Compute the average loss for the epoch
@@ -210,14 +222,15 @@ def run_experiment(CONFIG):
 
             return epoch_loss  # Return the average loss for the epoch
 
-        def validate(model, dataloader, device, criterion, epoch):
+        def compute_loss_for_dataloader(model, dataloader, device, criterion):
             model.eval()  # Set the model to evaluation mode
 
             running_loss = 0.0  # Initialize cumulative loss for the validation
 
-            # Disable gradient tracking during validation to save memory and computation
+            # Disable gradient tracking to save memory and computation
             with torch.no_grad():
-                # Iterate over the validation batches
+
+                # Iterate over the batches
                 for images, masks in dataloader:
                     images = images.to(device)  # Move images to the specified device
                     masks = masks.to(device).unsqueeze(1).float()  # Move masks to the specified device
@@ -232,12 +245,9 @@ def run_experiment(CONFIG):
                     running_loss += loss.item() * images.size(0)
 
             # Compute the average loss for the validation set
-            epoch_loss = running_loss / len(dataloader.dataset)
+            loss = running_loss / len(dataloader.dataset)
 
-            # Print the total validation loss
-            print(f'Epoch: {epoch}, Total Val Loss: {epoch_loss:.4f}')
-
-            return epoch_loss  # Return the average loss for validation
+            return loss  # Return the average loss for validation
 
         def visualize_predictions(model, dataloader, device):
             model.eval()
@@ -296,12 +306,16 @@ def run_experiment(CONFIG):
         else:
             optimizer = torch.optim.Adam(model.parameters(), lr=CONFIG['LEARNING_RATE'])
 
+        # Traioning and validating loop
         num_epochs = CONFIG['NUM_EPOCHS']
         train_losses = []
         val_losses = []
         for epoch in range(num_epochs):
             train_loss = train_loop(model, train_dataloader, optimizer, device, criterion, epoch)
-            val_loss = validate(model, val_dataloader, device, criterion, epoch)
+            val_loss = compute_loss_for_dataloader(model, val_dataloader, device, criterion)
+
+            # Print the total validation loss
+            print(f'Epoch: {epoch}, Total Val Loss: {val_loss:.4f}')
 
             if CONFIG['VISUALIZE_AFTER_EPOCH']:
                 visualize_predictions(model, val_dataloader, device)
@@ -315,6 +329,12 @@ def run_experiment(CONFIG):
             plt.legend()
             plt.tight_layout()
             plt.show()
+        
+        # Getting the test loss
+        test_loss = compute_loss_for_dataloader(model, test_dataloader, device, criterion)
+
+        # Print the total test loss
+        print(f'Epoch: {epoch}, Total Test Loss: {test_loss:.4f}')
 
         # Save the model's state_dict
         torch.save(model.state_dict(), CONFIG['MODEL_PATH'])
@@ -328,7 +348,8 @@ def run_experiment(CONFIG):
     if CONFIG['TEST_MODEL_WITH_PICTURE']:
 
         # Load the image using PIL
-        input_image = Image.open(CONFIG['TEST_PICTURE']).convert('RGB')
+        input_image = Image.open(CONFIG['TEST_PICTURE_PATH']).convert('RGB')
+        label_image = Image.open(CONFIG['TEST_LABEL_PATH'])
 
         # Resize the image to the model's expected input size
         input_image_resized = input_image.resize((CONFIG['GOAL_DATASET_HW'], CONFIG['GOAL_DATASET_HW']))
@@ -382,56 +403,84 @@ def run_experiment(CONFIG):
         if CONFIG['GOAL_DATASET_HW'] != CONFIG['REAL_DATASET_HW']:
             original_image_resized = cv2.resize(original_image_np, (CONFIG['REAL_DATASET_HW'], CONFIG['REAL_DATASET_HW']))
 
-        # Overlay mask on the original image
-        overlay = original_image_resized.copy()
-        overlay[predicted_mask_np[0] == 1] = [255, 0, 0]  # Color the mask region red
+        # Overlay predicted mask on the original image
+        overlay_predicted = original_image_resized.copy()
+        overlay_predicted[predicted_mask_np[0] == 1] = [255, 0, 0]  # Color the mask region red
+
+        # **Add the following code to process and overlay the original label mask**
+
+        # Convert the label image to a NumPy array
+        label_image_np = np.array(label_image)
+
+        # Resize label image to match the real dataset size if necessary
+        if label_image_np.shape[0] != CONFIG['REAL_DATASET_HW'] or label_image_np.shape[1] != CONFIG['REAL_DATASET_HW']:
+            label_image_resized = cv2.resize(label_image_np, (CONFIG['REAL_DATASET_HW'], CONFIG['REAL_DATASET_HW']), interpolation=cv2.INTER_NEAREST)
+        else:
+            label_image_resized = label_image_np
+
+        # Ensure label_image_resized is a 2D grayscale image
+        if len(label_image_resized.shape) == 3:
+            label_gray = cv2.cvtColor(label_image_resized, cv2.COLOR_RGB2GRAY)
+        else:
+            label_gray = label_image_resized
+
+        # Threshold the label image to create a binary mask
+        _, label_mask = cv2.threshold(label_gray, 127, 255, cv2.THRESH_BINARY)
+
+        # Create an overlay of the original image with the label mask
+        overlay_original = original_image_resized.copy()
+
+        # Create a boolean mask
+        mask = label_mask > 0
+
+        # Apply the mask to the overlay image (set mask pixels to red)
+        overlay_original[mask] = [255, 0, 0]  # Color the mask region red
 
         # Blend images
-        blended = cv2.addWeighted(original_image_resized, 0.7, overlay, 0.3, 0)
+        blended_predicted = cv2.addWeighted(original_image_resized, 0.7, overlay_predicted, 0.3, 0)
+        blended_original = cv2.addWeighted(original_image_resized, 0.7, overlay_original, 0.3, 0)
 
-        # Create a figure with two subplots
-        fig, axs = plt.subplots(1, 2, figsize=(12, 6))
+        # Create a figure with three subplots
+        fig, axs = plt.subplots(1, 3, figsize=(18, 6))
 
         # Display the original image
         axs[0].imshow(original_image_resized)
         axs[0].set_title('Original Image')
         axs[0].axis('off')
 
-        # Display the blended image
-        axs[1].imshow(blended)
+        # Display the blended predicted mask
+        axs[1].imshow(blended_predicted)
         axs[1].set_title('Predicted Mask Overlay')
         axs[1].axis('off')
 
+        # Display the blended original label mask
+        axs[2].imshow(blended_original)
+        axs[2].set_title('Original Mask Overlay')
+        axs[2].axis('off')
+
         plt.show()
 
-    return train_losses, val_losses
+    return train_losses, val_losses, test_loss
 
 # Base configuration
 base_CONFIG = {
     'GIT_FOLDER_ONLY': False,
-    'DATASET_NAME': '512x512_Ignored2_60_rgb_png_7056',
+    'DATASET_NAME': '256x256_Ignored2_60_rgb_png_28980',
+    'TEST_PICTURE_NAME': "1445-1-2017_10", # 407-1-2017_0 (G), 323-1-2017_45 (GIT)
     'SAVE_CONFIG_AS_JSON': True,
-    'REAL_DATASET_HW': 512,
+    'REAL_DATASET_HW': 256,
     'GOAL_DATASET_HW': 256,
-    'REAL_DATASET_SIZE': 7056,
-    'GOAL_DATASET_SIZE': 7056,
+    'REAL_DATASET_SIZE': 28980,
+    'GOAL_DATASET_SIZE': 28980,
     'N_BATCHES': 1008,
     'VISUALIZE_DATA': False,
     'VISUALIZE_AFTER_EPOCH': False,
     'PLOT_CONFIG_LOSS': False,
-    'LOAD_FROM_MODEL': False,
-    'TEST_MODEL_WITH_PICTURE': False,
+    'LOAD_FROM_MODEL': False,            # Select to open already trained models
+    'TEST_MODEL_WITH_PICTURE': False,    # Select to see model in a picture
     'MODEL_PATH': '',
     'DATASET_PATH': '',
-    'TEST_PICTURE': '',
-    'MODEL': 'UNet',
-    'LOSS_FUNCTION': 'FocalLoss',
-    'OPTIMIZER': 'Adam',
-    'LEARNING_RATE': 1e-4,
-    'BATCH_SIZE': 16,
-    'USE_SE': False,
-    'USE_CBAM': False,
-    'OVERSAMPLE': True,
+    'TEST_PICTURE_PATH': '',
     'FOCAL_LOSS_ALPHA': 1,
     'FOCAL_LOSS_GAMMA': 2,
     'FOREGROUND_WEIGHT': 10.0,
@@ -441,13 +490,15 @@ base_CONFIG = {
 
 # Hyperparameter grid
 hyperparameters = {
-    'MODEL': ['UNet', 'UNet_SE', 'UNet_CBAM'],
-    'LOSS_FUNCTION': ['FocalLoss', 'CrossEntropy', 'BCEWithLogitsLoss'],
-    'LEARNING_RATE': [1e-3, 1e-4, 1e-5],
-    'BATCH_SIZE': [8, 16],
-    'USE_SE': [False, True],
+    'OVERSAMPLE': [True, False],
+    'MODEL': ['UNet'],
     'USE_CBAM': [False, True],
-    'NUM_EPOCHS': [5, 10, 20]
+    'USE_SE': [False, True],
+    'LOSS_FUNCTION': ['FocalLoss', 'CrossEntropy', 'BCEWithLogitsLoss'],
+    'OPTIMIZER': ['Adam', 'SGD'],
+    'LEARNING_RATE': [1e-4],
+    'BATCH_SIZE': [8],
+    'NUM_EPOCHS': [10],
     # Add more hyperparameters as needed
 }
 
@@ -457,10 +508,8 @@ combinations = [dict(zip(keys, v)) for v in itertools.product(*values)]
 
 if base_CONFIG['GIT_FOLDER_ONLY']:
     base_CONFIG['DATASET_PATH'] = os.path.abspath(f'../repo/db/formatted_db/{base_CONFIG["DATASET_NAME"]}.h5')
-    base_CONFIG['TEST_PICTURE'] = os.path.abspath(f'../repo/db/raw_images/{base_CONFIG["DATASET_NAME"]}/Input/323-1-2017_45.png')
 else:
     base_CONFIG['DATASET_PATH'] = f'G:/3 - datasets/{base_CONFIG["DATASET_NAME"]}.h5'
-    base_CONFIG['TEST_PICTURE'] = f'G:/2 - processed-data/Input/407-1-2017_0.png'
 
 # Check if cuda is available
 if torch.cuda.is_available():
@@ -569,12 +618,13 @@ for idx, combo in enumerate(combinations):
 
     if config_run['GIT_FOLDER_ONLY']:
         config_run['MODEL_PATH'] = os.path.abspath(f'../repo/model/{model_filename}')
-        config_run['DATASET_PATH'] = os.path.abspath(f'../repo/db/formatted_db/{config_run["DATASET_NAME"]}.h5')
-        config_run['TEST_PICTURE'] = os.path.abspath(f'../repo/db/raw_images/{config_run["DATASET_NAME"]}/Input/323-1-2017_45.png')
+        config_run['TEST_PICTURE_PATH'] = os.path.abspath(f'../repo/db/raw_images/{config_run["DATASET_NAME"]}/Input/{config_run["TEST_PICTURE_NAME"]}.png')
+        config_run['TEST_LABEL_PATH'] = os.path.abspath(f'../repo/db/raw_images/{config_run["DATASET_NAME"]}/Output/{config_run["TEST_PICTURE_NAME"]}.png')
+
     else:
         config_run['MODEL_PATH'] = f'G:/4 - models/{model_filename}'
-        config_run['DATASET_PATH'] = f'G:/3 - datasets/{config_run["DATASET_NAME"]}.h5'
-        config_run['TEST_PICTURE'] = f'G:/2 - processed-data/Input/407-1-2017_0.png'
+        config_run['TEST_PICTURE_PATH'] = f'G:/2 - processed-data/Input/{config_run["TEST_PICTURE_NAME"]}.png'
+        config_run['TEST_LABEL_PATH'] = f'G:/2 - processed-data/Output/{config_run["TEST_PICTURE_NAME"]}.png'
 
     # Optionally, adjust other CONFIG settings based on hyperparameters
     if config_run['LOSS_FUNCTION'] == 'FocalLoss':
@@ -582,7 +632,7 @@ for idx, combo in enumerate(combinations):
         config_run['FOCAL_LOSS_GAMMA'] = 2
 
     # Run the experiment with the updated configuration
-    train_losses, val_losses = run_experiment(config_run)
+    train_losses, val_losses, test_loss = run_experiment(config_run)
 
     # Update epochs completed
     num_epochs = config_run['NUM_EPOCHS']
@@ -599,13 +649,17 @@ for idx, combo in enumerate(combinations):
     print(f"Total time elapsed: {total_time_so_far / 60:.2f} minutes")
     print(f"Estimated time left for all combinations: {estimated_time_left / 60:.2f} minutes")
 
-    # Store results with hyperparameters
-    results.append({
-        'hyperparameters': combo,
-        'train_losses': train_losses,
-        'val_losses': val_losses,
-    })
+    if not base_CONFIG['LOAD_FROM_MODEL']:
 
-# After all experiments, save results to a file
-with open('experiment_results.json', 'w') as f:
-    json.dump(results, f, indent=4)
+        # Store results with hyperparameters
+        results.append({
+            'hyperparameters': combo,
+            'train_losses': train_losses,
+            'val_losses': val_losses,
+            'test_loss': test_loss
+        })
+
+if not base_CONFIG['LOAD_FROM_MODEL']:
+    # After all experiments, save results to a file
+    with open('experiment_results.json', 'w') as f:
+        json.dump(results, f, indent=4)
