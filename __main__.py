@@ -54,8 +54,9 @@ def run_experiment(CONFIG):
     # Create the model filename
     model_filename = generate_model_filename(CONFIG)
 
+    # Create the model path for the model to be used in the training
     if CONFIG['GIT_FOLDER_ONLY']:
-        CONFIG['MODEL_PATH'] = os.path.abspath(f'../repo/model/{model_filename}')
+        CONFIG['MODEL_PATH'] = os.path.abspath(f'../model/{model_filename}')
     
     else:
         CONFIG['MODEL_PATH'] = f'G:/4 - models/{model_filename}'
@@ -98,6 +99,7 @@ def run_experiment(CONFIG):
             # Create labels: 0 if no positive pixels, 1 if any positive pixels
             ytrain_labels = (ytrain_flat > 0).long()
 
+            # Create the sampler for the train dataloader
             class_sample_count = np.array([len(np.where(ytrain_labels.numpy() == t)[0]) for t in np.unique(ytrain_labels.numpy())])
             weight = 1. / class_sample_count
             samples_weight = np.array([weight[t] for t in ytrain_labels.numpy()])
@@ -109,6 +111,7 @@ def run_experiment(CONFIG):
         else:
             train_dataloader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
 
+        # Create the dataloaders for both the test and validation sets
         test_dataloader = DataLoader(test_set, batch_size=batch_size, shuffle=False)
         val_dataloader = DataLoader(test_set, batch_size=4)
 
@@ -214,6 +217,7 @@ def run_experiment(CONFIG):
                       f'Estimated time left for epoch: {estimated_time_left:.2f} s')"""
 
             epoch_end_time = time.time()  # End time for the epoch
+
             # Compute the average loss for the epoch
             epoch_loss = running_loss / len(dataloader.dataset)
 
@@ -311,12 +315,15 @@ def run_experiment(CONFIG):
         train_losses = []
         val_losses = []
         for epoch in range(num_epochs):
+
+            # Calculate the train and validation losses
             train_loss = train_loop(model, train_dataloader, optimizer, device, criterion, epoch)
             val_loss = compute_loss_for_dataloader(model, val_dataloader, device, criterion)
 
             # Print the total validation loss
             print(f'Epoch: {epoch}, Total Val Loss: {val_loss:.4f}')
 
+            # Visualize the validation predictions
             if CONFIG['VISUALIZE_AFTER_EPOCH']:
                 visualize_predictions(model, val_dataloader, device)
 
@@ -407,8 +414,6 @@ def run_experiment(CONFIG):
         overlay_predicted = original_image_resized.copy()
         overlay_predicted[predicted_mask_np[0] == 1] = [255, 0, 0]  # Color the mask region red
 
-        # **Add the following code to process and overlay the original label mask**
-
         # Convert the label image to a NumPy array
         label_image_np = np.array(label_image)
 
@@ -466,7 +471,7 @@ def run_experiment(CONFIG):
 base_CONFIG = {
     'GIT_FOLDER_ONLY': False,
     'DATASET_NAME': '256x256_Ignored2_60_rgb_png_28980',
-    'TEST_PICTURE_NAME': "1445-1-2017_10", # 407-1-2017_0 (G), 323-1-2017_45 (GIT)
+    'TEST_PICTURE_NAME': "25717-1-2021_59", # 407-1-2017_0 (G), 323-1-2017_45 (GIT)
     'SAVE_CONFIG_AS_JSON': True,
     'REAL_DATASET_HW': 256,
     'GOAL_DATASET_HW': 256,
@@ -476,8 +481,8 @@ base_CONFIG = {
     'VISUALIZE_DATA': False,
     'VISUALIZE_AFTER_EPOCH': False,
     'PLOT_CONFIG_LOSS': False,
-    'LOAD_FROM_MODEL': False,            # Select to open already trained models
-    'TEST_MODEL_WITH_PICTURE': False,    # Select to see model in a picture
+    'LOAD_FROM_MODEL': True,            # Select to open already trained models
+    'TEST_MODEL_WITH_PICTURE': True,    # Select to see model in a picture
     'MODEL_PATH': '',
     'DATASET_PATH': '',
     'TEST_PICTURE_PATH': '',
@@ -490,13 +495,13 @@ base_CONFIG = {
 
 # Hyperparameter grid
 hyperparameters = {
-    'OVERSAMPLE': [True, False],
+    'OVERSAMPLE': [True],
     'MODEL': ['UNet'],
     'USE_CBAM': [False, True],
     'USE_SE': [False, True],
-    'LOSS_FUNCTION': ['FocalLoss', 'CrossEntropy', 'BCEWithLogitsLoss'],
-    'OPTIMIZER': ['Adam', 'SGD'],
-    'LEARNING_RATE': [1e-4],
+    'LOSS_FUNCTION': ['FocalLoss', 'BCEWithLogitsLoss'], # 'CrossEntropy'
+    'OPTIMIZER': ['Adam'],
+    'LEARNING_RATE': [1e-4, 1e-5],
     'BATCH_SIZE': [8],
     'NUM_EPOCHS': [10],
     # Add more hyperparameters as needed
@@ -506,15 +511,18 @@ hyperparameters = {
 keys, values = zip(*hyperparameters.items())
 combinations = [dict(zip(keys, v)) for v in itertools.product(*values)]
 
-if base_CONFIG['GIT_FOLDER_ONLY']:
-    base_CONFIG['DATASET_PATH'] = os.path.abspath(f'../repo/db/formatted_db/{base_CONFIG["DATASET_NAME"]}.h5')
-else:
-    base_CONFIG['DATASET_PATH'] = f'G:/3 - datasets/{base_CONFIG["DATASET_NAME"]}.h5'
+if not base_CONFIG['LOAD_FROM_MODEL']:
+    if base_CONFIG['GIT_FOLDER_ONLY']:
+        base_CONFIG['DATASET_PATH'] = os.path.abspath(f'../db/formatted_db/{base_CONFIG["DATASET_NAME"]}.h5')
+
+    else:
+        base_CONFIG['DATASET_PATH'] = f'G:/3 - datasets/{base_CONFIG["DATASET_NAME"]}.h5'
 
 # Check if cuda is available
 if torch.cuda.is_available():
     print('cuda is available')
     device = torch.device("cuda:0")
+
 else:
     print('cuda is not available')
     device = torch.device("cpu")
@@ -540,6 +548,7 @@ if not base_CONFIG['LOAD_FROM_MODEL']:
     train_ratio = original_train_size / original_total_size
     test_ratio = original_test_size / original_total_size
 
+    # Extract the desired sizes
     desired_train_size = int(base_CONFIG['GOAL_DATASET_SIZE'] * train_ratio)
     desired_test_size = base_CONFIG['GOAL_DATASET_SIZE'] - desired_train_size  # Ensure total adds up
 
@@ -577,10 +586,13 @@ if not base_CONFIG['LOAD_FROM_MODEL']:
             # Ensure labels have a channel dimension
             if labels.dim() == 3:
                 labels = labels.unsqueeze(1)
+
             # Convert to float for interpolation
             labels = labels.float()
+
             # Resize using nearest neighbor to preserve label values
             labels = F.interpolate(labels, size=size, mode='nearest')
+
             # Remove channel dimension and convert back to long
             labels = labels.squeeze(1).long()
             return labels
@@ -616,13 +628,12 @@ for idx, combo in enumerate(combinations):
     # Generate the model filename and update paths
     model_filename = generate_model_filename(config_run)
 
+    # Define all the paths to the final test pictures
     if config_run['GIT_FOLDER_ONLY']:
-        config_run['MODEL_PATH'] = os.path.abspath(f'../repo/model/{model_filename}')
-        config_run['TEST_PICTURE_PATH'] = os.path.abspath(f'../repo/db/raw_images/{config_run["DATASET_NAME"]}/Input/{config_run["TEST_PICTURE_NAME"]}.png')
-        config_run['TEST_LABEL_PATH'] = os.path.abspath(f'../repo/db/raw_images/{config_run["DATASET_NAME"]}/Output/{config_run["TEST_PICTURE_NAME"]}.png')
+        config_run['TEST_PICTURE_PATH'] = os.path.abspath(f'../db/raw_images/{config_run["DATASET_NAME"]}/Input/{config_run["TEST_PICTURE_NAME"]}.png')
+        config_run['TEST_LABEL_PATH'] = os.path.abspath(f'../db/raw_images/{config_run["DATASET_NAME"]}/Output/{config_run["TEST_PICTURE_NAME"]}.png')
 
     else:
-        config_run['MODEL_PATH'] = f'G:/4 - models/{model_filename}'
         config_run['TEST_PICTURE_PATH'] = f'G:/2 - processed-data/Input/{config_run["TEST_PICTURE_NAME"]}.png'
         config_run['TEST_LABEL_PATH'] = f'G:/2 - processed-data/Output/{config_run["TEST_PICTURE_NAME"]}.png'
 

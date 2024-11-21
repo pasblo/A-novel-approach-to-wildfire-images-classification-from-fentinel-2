@@ -121,8 +121,10 @@ class WildfireSegmentation(nn.Module):
         ]
         if self.use_se:
             layers.append(SEBlock(out_channels))
+
         if self.use_cbam:
             layers.append(CBAM(out_channels))
+            
         return nn.Sequential(*layers)
 
     def forward(self, x):
