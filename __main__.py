@@ -85,7 +85,7 @@ def run_experiment(CONFIG):
         val_losses = []
         test_loss = 0
 
-    else:
+    elif not os.path.exists(CONFIG['MODEL_PATH']): # Make sure the exact same model has not been trained already
 
         # Calculate batch size
         batch_size = CONFIG['BATCH_SIZE']
@@ -467,11 +467,20 @@ def run_experiment(CONFIG):
 
     return train_losses, val_losses, test_loss
 
+# Pictures with clear fire areas (From less to more)
+# 41-1-2017_0, 179-1-2017_17, (4141-1-2018_14 4143-1-2018_14), 17945-1-2020_74, 22541-1-2021_145, 25717-1-2021_59, 21857-1-2021_135
+
+# Pictures with clear no fire areas
+# 21535-0-2021_130, 15668-0-2020_49, 11363-0-2019_7
+
+# Pictures with supposed fire areas
+# 15503-1-2020_47, 6469-1-2019_12
+
 # Base configuration
 base_CONFIG = {
     'GIT_FOLDER_ONLY': False,
     'DATASET_NAME': '256x256_Ignored2_60_rgb_png_28980',
-    'TEST_PICTURE_NAME': "25717-1-2021_59", # 407-1-2017_0 (G), 323-1-2017_45 (GIT)
+    'TEST_PICTURE_NAME': "6469-1-2019_12",
     'SAVE_CONFIG_AS_JSON': True,
     'REAL_DATASET_HW': 256,
     'GOAL_DATASET_HW': 256,
@@ -486,7 +495,7 @@ base_CONFIG = {
     'MODEL_PATH': '',
     'DATASET_PATH': '',
     'TEST_PICTURE_PATH': '',
-    'FOCAL_LOSS_ALPHA': 1,
+    'FOCAL_LOSS_ALPHA': 1,              # Just using 1 for all cases
     'FOCAL_LOSS_GAMMA': 2,
     'FOREGROUND_WEIGHT': 10.0,
     'USE_DATA_AUGMENTATION': False,
@@ -495,15 +504,15 @@ base_CONFIG = {
 
 # Hyperparameter grid
 hyperparameters = {
-    'OVERSAMPLE': [True],
-    'MODEL': ['UNet'],
-    'USE_CBAM': [False, True],
-    'USE_SE': [False, True],
-    'LOSS_FUNCTION': ['FocalLoss', 'BCEWithLogitsLoss'], # 'CrossEntropy'
-    'OPTIMIZER': ['Adam'],
-    'LEARNING_RATE': [1e-4, 1e-5],
-    'BATCH_SIZE': [8],
-    'NUM_EPOCHS': [10],
+    'OVERSAMPLE': [True], # 2 options
+    'MODEL': ['UNet'], # 1 option
+    'USE_CBAM': [False, True], # 2 options
+    'USE_SE': [False, True], # 2 options, maybe helps a little bit
+    'LOSS_FUNCTION': ['BCEWithLogitsLoss'], # 3 options, 'CrossEntropy' discarded on the first round, 'FocalLoss' discarded on the second round
+    'OPTIMIZER': ['Adam'], # 2 options,
+    'LEARNING_RATE': [1e-3, 1e-4], # 3 options, With lower learning rate slightly worse results were obtained on second round
+    'BATCH_SIZE': [8], # 4, 8, 12, 16 4 options
+    'NUM_EPOCHS': [10], # 10, 20 2 options
     # Add more hyperparameters as needed
 }
 

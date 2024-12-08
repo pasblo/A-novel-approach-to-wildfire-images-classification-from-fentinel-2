@@ -6,6 +6,7 @@ import torch.nn.functional as F
 
 # Define Squeeze-and-Excitation (SE) Block
 class SEBlock(nn.Module):
+    # Based on https://github.com/jonnedtc/Squeeze-Excitation-PyTorch/blob/master/networks.py
     def __init__(self, channels, reduction=16):
         super(SEBlock, self).__init__()
         self.fc1 = nn.Linear(channels, channels // reduction, bias=False)
@@ -23,8 +24,10 @@ class SEBlock(nn.Module):
 
 # Define Convolutional Block Attention Module (CBAM)
 class CBAM(nn.Module):
+    # Based on https://github.com/luuuyi/CBAM.PyTorch/blob/master/model/resnet_cbam.py
     def __init__(self, channels, reduction=16, kernel_size=7):
         super(CBAM, self).__init__()
+
         # Channel Attention Module
         self.channel_avg_pool = nn.AdaptiveAvgPool2d(1)
         self.channel_max_pool = nn.AdaptiveMaxPool2d(1)
@@ -34,6 +37,7 @@ class CBAM(nn.Module):
             nn.Conv2d(channels // reduction, channels, 1, bias=False)
         )
         self.channel_sigmoid = nn.Sigmoid()
+
         # Spatial Attention Module
         self.spatial_conv = nn.Conv2d(2, 1, kernel_size, padding=kernel_size // 2, bias=False)
         self.spatial_sigmoid = nn.Sigmoid()
@@ -59,6 +63,7 @@ class CBAM(nn.Module):
 
 # Define Focal Loss
 class FocalLoss(nn.Module):
+    # Based on https://pytorch.org/vision/main/_modules/torchvision/ops/focal_loss.html
     def __init__(self, alpha=1, gamma=2, logits=False, reduction='mean'):
         super(FocalLoss, self).__init__()
         self.alpha = alpha  # Balancing factor
@@ -71,7 +76,9 @@ class FocalLoss(nn.Module):
             BCE_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction='none')
         else:
             BCE_loss = F.binary_cross_entropy(inputs, targets, reduction='none')
-        pt = torch.exp(-BCE_loss)
+
+        p = torch.sigmoid(inputs)
+        pt = p * targets - (1 - p) * (1 - targets)
         F_loss = self.alpha * (1 - pt) ** self.gamma * BCE_loss
 
         if self.reduction == 'mean':
@@ -81,6 +88,7 @@ class FocalLoss(nn.Module):
 
 # Define the WildfireSegmentation Model
 class WildfireSegmentation(nn.Module):
+    # Extracted from the course slides (U-model)
     def __init__(self, num_classes=1, input_channels=3, use_se=False, use_cbam=False):
         super(WildfireSegmentation, self).__init__()
         self.use_se = use_se
