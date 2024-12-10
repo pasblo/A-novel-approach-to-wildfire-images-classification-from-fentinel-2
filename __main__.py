@@ -52,7 +52,8 @@ def generate_model_filename(config):
 def run_experiment(CONFIG):
 
     # Create the model filename
-    model_filename = generate_model_filename(CONFIG)
+    #model_filename = generate_model_filename(CONFIG)
+    model_filename = "256x256_Ignored2_60_rgb_png_28980_MODEL_UNet_LOSS_FUNCTION_FocalLoss_OPTIMIZER_Adam_LEARNING_RATE_1e-04_NUM_EPOCHS_10_BATCH_SIZE_8_USE_SE_F_USE_CBAM_F_FOCAL_LOSS_ALPHA_0p5_FOCAL_LOSS_GAMMA_2_FOREGROUND_WEIGHT_10p0.pth"
 
     # Create the model path for the model to be used in the training
     if CONFIG['GIT_FOLDER_ONLY']:
@@ -476,11 +477,14 @@ def run_experiment(CONFIG):
 # Pictures with supposed fire areas
 # 15503-1-2020_47, 6469-1-2019_12
 
+# Test pictures with old models
+# 5321-1-2021_135, 6353-1-2021_62, 1534-0-2019_1
+
 # Base configuration
 base_CONFIG = {
     'GIT_FOLDER_ONLY': False,
-    'DATASET_NAME': '256x256_Ignored2_60_rgb_png_28980',
-    'TEST_PICTURE_NAME': "6469-1-2019_12",
+    'DATASET_NAME': '256x256_Ignored2_60_rgb_png_28980', #'256x256_Ignored2_60_rgb_png_28980',
+    'TEST_PICTURE_NAME': "17945-1-2020_74",
     'SAVE_CONFIG_AS_JSON': True,
     'REAL_DATASET_HW': 256,
     'GOAL_DATASET_HW': 256,

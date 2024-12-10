@@ -6,11 +6,11 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 
 # Configurations
-GIT_FOLDER_ONLY = True # Set to true if working with the git folder database
+GIT_FOLDER_ONLY = False # Set to true if working with the git folder database
 DATASET_NAME = "FLOGA_dataset_2017_sen2_60_mod_500"
 EVENT = "0"
 GET_DATABASE_INFO = True
-GET_SAMPLE_LAYERS = True
+GET_SAMPLE_LAYERS = False
 GET_PICTURES = True
 
 # Generate paths
